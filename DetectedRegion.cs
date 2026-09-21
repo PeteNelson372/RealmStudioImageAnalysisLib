@@ -11,5 +11,5 @@ namespace RealmStudioImageAnalysisLib
         public SKPath Boundary { get; init; } = new();
         public List<SKPath> Holes { get; } = [];
         public bool IsSelected { get; set; }
-    }
+    } 
 }

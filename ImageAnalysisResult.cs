@@ -7,5 +7,5 @@
         public int ImageHeight { get; init; }
 
         public List<DetectedRegion> Regions { get; } = [];
-    }
+    } 
 }

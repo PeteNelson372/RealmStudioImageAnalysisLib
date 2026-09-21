@@ -20,7 +20,7 @@ public sealed class ImageLandformAnalyzer
     private const int MaterialMinimumRayPixels = 16;
     private const int MaterialClosingSize = 15;
 
-    public ImageAnalysisResult Analyze(string filename)
+    public static ImageAnalysisResult Analyze(string filename)
     {
         using SKBitmap source =
             SKBitmap.Decode(filename)
