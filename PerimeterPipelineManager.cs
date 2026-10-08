@@ -1,4 +1,6 @@
-﻿namespace RealmStudioImageAnalysisLib
+﻿using RealmStudioShapeRenderingLib;
+
+namespace RealmStudioImageAnalysisLib
 {
     public sealed class PerimeterPipelineManager
     {
@@ -27,6 +29,12 @@
         public bool TryGet(string name, out PerimeterPipeline? pipeline)
         {
             return _pipelines.TryGetValue(name, out pipeline);
+        }
+
+        public IEnumerable<PerimeterPipeline> GetPipelines(PerimeterPipelineType type)
+        {
+            return _pipelines.Values
+                .Where(p => p.Type == type);
         }
     }
 }

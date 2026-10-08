@@ -1,9 +1,15 @@
-﻿namespace RealmStudioImageAnalysisLib
+﻿using RealmStudioShapeRenderingLib;
+
+namespace RealmStudioImageAnalysisLib
 {
     public sealed class PerimeterPipelineDefinition
     {
-        public string Name { get; init; } = "";
+        public required string Name { get; init; }
 
-        public List<PerimeterStageDefinition> Stages { get; init; } = [];
+        public PerimeterPipelineType Type { get; init; }
+
+        public bool Debug { get; init; }
+
+        public List<PerimeterStageDefinition> Stages { get; } = [];
     }
 }

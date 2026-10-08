@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RealmStudioShapeRenderingLib\RealmStudioShapeRenderingLib.csproj" />
+    <ProjectReference Include="..\RealmStudioX.Infrastructure\RealmStudioX.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

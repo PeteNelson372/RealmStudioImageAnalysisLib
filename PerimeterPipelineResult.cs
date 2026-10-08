@@ -1,20 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using RealmStudioShapeRenderingLib;
+using SkiaSharp;
 
 namespace RealmStudioImageAnalysisLib
 {
     public sealed class PerimeterPipelineResult
     {
-        public string PipelineName { get; init; } = "";
+        public string PipelineName { get; init; } = string.Empty;
 
         public bool Succeeded { get; init; }
 
-        public IReadOnlyList<PerimeterCandidate> Candidates { get; init; } = [];
+        public IReadOnlyList<ImportRegion> ImportRegions { get; init; } = [];
 
-        public double Confidence { get; init; }
+        public IReadOnlyList<SKPath> RefinedPerimeters { get; init; } = [];
 
         public string? FailureReason { get; init; }
     }

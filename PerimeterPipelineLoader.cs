@@ -1,5 +1,6 @@
 ﻿namespace RealmStudioImageAnalysisLib
 {
+    using RealmStudioShapeRenderingLib;
     using System.Xml.Linq;
 
     public sealed class PerimeterPipelineLoader
@@ -28,9 +29,32 @@
                 throw new InvalidDataException("The Pipeline element must have a 'name' attribute.");
             }
 
+            PerimeterPipelineType type = PerimeterPipelineType.Extraction;
+
+            string? typeAttribute = root.Attribute("type")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(typeAttribute))
+            {
+                if (!Enum.TryParse(typeAttribute, ignoreCase: true, out type))
+                {
+                    throw new InvalidDataException($"The Pipeline element has an invalid 'type' attribute value '{typeAttribute}'.");
+                }
+            }
+
+            bool debug = false;
+
+            string? debugAttribute = root.Attribute("debug")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(debugAttribute))
+            {
+                debug = bool.TryParse(debugAttribute, out var result) && result;
+            }
+
             var definition = new PerimeterPipelineDefinition
             {
-                Name = name
+                Name = name,
+                Type = type,
+                Debug = debug,
             };
 
             foreach (var stageElement in root.Elements("Stage"))
@@ -57,13 +81,25 @@
                 throw new InvalidDataException("A Stage element is missing its 'id' attribute.");
             }
 
+            bool debug = false;
+
+            string? debugAttribute = element.Attribute("debug")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(debugAttribute))
+            {
+                debug = bool.Parse(debugAttribute);
+            }
+
             var definition = new PerimeterStageDefinition
             {
                 Id = id,
+
                 SaveOutput = ParseBooleanAttribute(
                     element,
                     "saveOutput",
                     defaultValue: false),
+
+                OutputArtifact = (string?)element.Attribute("outputArtifact"),
 
                 OutputName = (string?)element.Attribute("outputName")
             };

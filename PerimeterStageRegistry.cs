@@ -2,29 +2,38 @@
 {
     public sealed class PerimeterStageRegistry
     {
+        private readonly Dictionary<string, IPerimeterStage> _stages =
+            new(StringComparer.OrdinalIgnoreCase);
+
         public void Register(IPerimeterStage stage)
         {
             ArgumentNullException.ThrowIfNull(stage);
 
             if (string.IsNullOrWhiteSpace(stage.Id))
             {
-                throw new ArgumentException("Stage ID cannot be null or whitespace.", nameof(stage));
+                throw new ArgumentException(
+                    "Stage ID cannot be null or whitespace.",
+                    nameof(stage));
             }
 
+            if (!_stages.TryAdd(stage.Id, stage))
+            {
+                throw new InvalidOperationException(
+                    $"A stage with ID '{stage.Id}' is already registered.");
+            }
         }
 
         public IPerimeterStage Get(string id)
         {
-            ArgumentNullException.ThrowIfNull(id);
+            ArgumentException.ThrowIfNullOrWhiteSpace(id);
 
-            if (string.IsNullOrWhiteSpace(id))
+            if (_stages.TryGetValue(id, out IPerimeterStage? stage))
             {
-                throw new ArgumentException("ID cannot be null or whitespace.", nameof(id));
+                return stage;
             }
 
-
-
-            throw new InvalidOperationException($"No stage found with ID '{id}'.");
+            throw new InvalidOperationException(
+                $"No stage found with ID '{id}'.");
         }
     }
 }

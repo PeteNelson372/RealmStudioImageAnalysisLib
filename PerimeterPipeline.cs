@@ -1,8 +1,14 @@
-﻿namespace RealmStudioImageAnalysisLib
+﻿using RealmStudioShapeRenderingLib;
+
+namespace RealmStudioImageAnalysisLib
 {
     public sealed class PerimeterPipeline
     {
         public string Name { get; }
+
+        public PerimeterPipelineType Type { get; }
+
+        public bool Debug { get; }
 
         public IReadOnlyList<PerimeterPipelineStage> Stages { get; }
 
@@ -12,6 +18,10 @@
             ArgumentNullException.ThrowIfNull(registry);
 
             Name = definition.Name;
+
+            Type = definition.Type;
+
+            Debug = definition.Debug;
 
             Stages = [.. definition.Stages.Select(stageDefinition =>
                 {

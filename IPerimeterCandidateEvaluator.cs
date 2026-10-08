@@ -1,9 +1,11 @@
-﻿namespace RealmStudioImageAnalysisLib
+﻿using RealmStudioShapeRenderingLib;
+
+namespace RealmStudioImageAnalysisLib
 {
     public interface IPerimeterCandidateEvaluator
     {
         PerimeterCandidateEvaluation Evaluate(
-            PerimeterCandidate candidate,
+            ImportRegion candidate,
             PerimeterPipelineData data);
     }
 }
