@@ -3,10 +3,9 @@ using SkiaSharp;
 
 namespace RealmStudioImageAnalysisLib
 {
-    public sealed class PerimeterPipelineData : IDisposable
+    public sealed class PerimeterPipelineData
     {
-        private readonly Dictionary<string, object> _artifacts =
-            new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<NamedStageArtifact> _artifacts = [];
 
         public SKBitmap OriginalBitmap { get; }
 
@@ -17,80 +16,55 @@ namespace RealmStudioImageAnalysisLib
             OriginalBitmap = originalBitmap;
         }
 
-        public PerimeterPipelineData(SKBitmap originalBitmap, IReadOnlyList<ImportRegion> importRegions) : this(originalBitmap)
+        public PerimeterPipelineData(SKBitmap originalBitmap, IReadOnlyList<ImportRegion> importRegions)
+            : this(originalBitmap)
         {
             ArgumentNullException.ThrowIfNull(importRegions);
 
             Set("ImportRegions", importRegions);
         }
 
-        public void Set<T>(string name, T value)
+        public void Set<T>(string name, T artifact)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
-            ArgumentNullException.ThrowIfNull(value);
 
-            if (_artifacts.TryGetValue(name, out object? existing))
+            NamedStageArtifact namedArtifact = new(name, artifact);
+
+            int index = _artifacts.FindIndex(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            if (index >= 0)
             {
-                if (existing is IDisposable disposable)
-                    disposable.Dispose();
+                _artifacts[index] = namedArtifact;
             }
-
-            _artifacts[name] = value;
+            else
+            {
+                _artifacts.Add(namedArtifact);
+            }
         }
 
         public T Get<T>(string name)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-            if (!_artifacts.TryGetValue(name, out object? value))
+            NamedStageArtifact? artifact = _artifacts.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"Artifact '{name}' was not found.");
+
+            if (artifact.Artifact is not T typedArtifact)
             {
                 throw new InvalidOperationException(
-                    $"Pipeline artifact '{name}' was not found.");
+                    $"Artifact '{name}' is of type " +
+                    $"{artifact.Artifact?.GetType().Name ?? "null"}, " +
+                    $"not {typeof(T).Name}.");
             }
 
-            if (value is not T typedValue)
-            {
-                throw new InvalidOperationException(
-                    $"Pipeline artifact '{name}' is not of type " +
-                    $"{typeof(T).Name}.");
-            }
-
-            return typedValue;
-        }
-
-        public bool TryGet<T>(
-            string name,
-            out T? value)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
-            if (_artifacts.TryGetValue(name, out object? artifact) &&
-                artifact is T typedArtifact)
-            {
-                value = typedArtifact;
-                return true;
-            }
-
-            value = default;
-            return false;
+            return typedArtifact;
         }
 
         public bool Contains(string name)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-            return _artifacts.ContainsKey(name);
-        }
-
-        public void Dispose()
-        {
-            foreach (object artifact in _artifacts.Values)
-            {
-                if (artifact is IDisposable disposable)
-                    disposable.Dispose();
-            }
-
-            _artifacts.Clear();
+            return _artifacts.Any(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

@@ -17,12 +17,25 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat combinedEdges = data.Get<Mat>("CombinedEdges");
+            List<string> inputNames = [.. context.InputArtifacts];
 
-            IReadOnlyList<LandformEndpoint> endpoints =
-                FindLandformEndpoints(combinedEdges);
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
 
-            data.Set("Endpoints", endpoints);
+            Mat combinedEdges =
+                data.Get<Mat>(context.GetInputArtifact(inputNames[0])) ?? throw new InvalidOperationException(
+                    $"{Id} requires an input artifact.");
+
+            IReadOnlyList<LandformEndpoint> endpoints = FindLandformEndpoints(combinedEdges);
+
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException($"{Id} requires an output artifact."),
+                endpoints);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

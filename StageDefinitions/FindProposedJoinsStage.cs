@@ -1,4 +1,5 @@
 ﻿using Emgu.CV;
+using RealmStudioShapeRenderingLib;
 using SkiaSharp;
 
 namespace RealmStudioImageAnalysisLib.StageDefinitions
@@ -23,7 +24,16 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            List<LandformEndpoint> endpoints = data.Get<List<LandformEndpoint>>("Endpoints");
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            List<LandformEndpoint> endpoints = data.Get<List<LandformEndpoint>>(context.GetInputArtifact(inputNames[0]));
 
             Mat sourceMat = data.Get<Mat>("SourceMat");
 
@@ -33,7 +43,11 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     sourceMat.Width,
                     sourceMat.Height);
 
-            data.Set("ProposedJoins", proposedJoins);
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
+                proposedJoins);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

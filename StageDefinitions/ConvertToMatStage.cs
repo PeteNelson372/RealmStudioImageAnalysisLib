@@ -18,13 +18,27 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            SKBitmap paddedBitmap =
-                data.Get<SKBitmap>("PaddedBitmap");
+            List<string> inputNames = [.. context.InputArtifacts];
 
-            Mat sourceMat = CreateMat(paddedBitmap);
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            SKBitmap bitmap =
+                data.Get<SKBitmap>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
+
+            Mat sourceMat = CreateMat(bitmap);
 
             data.Set(
-                "SourceMat",
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 sourceMat);
 
             context.Progress?.Report(

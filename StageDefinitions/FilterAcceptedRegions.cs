@@ -19,10 +19,9 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     "ImportRegions");
 
             IReadOnlyList<ImportRegion> acceptedRegions =
-                importRegions
+                [.. importRegions
                     .Where(r =>
-                        r.State == ImportRegionState.Accepted)
-                    .ToList();
+                        r.State == ImportRegionState.Accepted)];
 
             data.Set(
                 "AcceptedImportRegions",

@@ -1,6 +1,7 @@
 ﻿using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
+using RealmStudioShapeRenderingLib;
 
 namespace RealmStudioImageAnalysisLib.StageDefinitions
 {
@@ -17,12 +18,24 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat dilatedScaffold =
-                data.Get<Mat>("DilatedScaffold");
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly two input artifact.
+            if (inputNames.Count != 2)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly two input artifact, but {inputNames.Count} were provided.");
+            }
+
+            // Retrieve the declared inputs by name.
+            // This stage assumes the first input is the dilated scaffold, and the second input is the list of accepted joins.
+            // The input names are expected to be provided in the order they are declared in the stage configuration.
+            // If the input names are not provided in the expected order, an exception will be thrown.
+
+            Mat dilatedScaffold = data.Get<Mat>(context.GetInputArtifact(inputNames[0]));
 
             IReadOnlyList<LandformEndpointJoin> acceptedJoins =
-                data.Get<IReadOnlyList<LandformEndpointJoin>>(
-                    "AcceptedJoins");
+                data.Get<IReadOnlyList<LandformEndpointJoin>>(context.GetInputArtifact(inputNames[1]));
 
             Mat repairedScaffold = dilatedScaffold.Clone();
 
@@ -50,7 +63,13 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     0);
             }
 
-            data.Set("RepairedScaffold", repairedScaffold);
+            // Publish the result using the configured output name.
+            if (string.IsNullOrWhiteSpace(context.OutputArtifact))
+            {
+                throw new InvalidOperationException($"Stage '{Id}' has no output artifact configured.");
+            }
+
+            data.Set(context.OutputArtifact, repairedScaffold);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

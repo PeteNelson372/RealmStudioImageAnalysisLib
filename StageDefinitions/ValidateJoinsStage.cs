@@ -29,12 +29,26 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly two input artifacts.
+            if (inputNames.Count != 2)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly two input artifacts, but {inputNames.Count} were provided.");
+            }
+
             IReadOnlyList<LandformEndpointJoin> proposedJoins =
                 data.Get<IReadOnlyList<LandformEndpointJoin>>(
-                    "ProposedJoins");
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
 
             Mat dilatedScaffold =
-                data.Get<Mat>("DilatedScaffold");
+                data.Get<Mat>(
+                    context.GetInputArtifact(inputNames[1])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
 
             List<LandformEndpointJoin> acceptedJoins = [];
 
@@ -51,7 +65,11 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 }
             }
 
-            data.Set("AcceptedJoins", acceptedJoins);
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
+                acceptedJoins);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

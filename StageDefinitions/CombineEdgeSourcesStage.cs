@@ -15,8 +15,22 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat cannyEdges = data.Get<Mat>("CannyEdges");
-            Mat whiteBoundary = data.Get<Mat>("WhiteBoundary");
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly two input artifact.
+            if (inputNames.Count != 2)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly two input artifact, but {inputNames.Count} were provided.");
+            }
+
+            // Retrieve the declared inputs by name.
+            // This stage assumes the first input is the dilated scaffold, and the second input is the list of accepted joins.
+            // The input names are expected to be provided in the order they are declared in the stage configuration.
+            // If the input names are not provided in the expected order, an exception will be thrown.
+
+            Mat cannyEdges = data.Get<Mat>(context.GetInputArtifact(inputNames[0]));
+            Mat whiteBoundary = data.Get<Mat>(context.GetInputArtifact(inputNames[1]));
 
             Mat combinedEdges = new();
 
@@ -25,7 +39,10 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 whiteBoundary,
                 combinedEdges);
 
-            data.Set("CombinedEdges", combinedEdges);
+            // context.OutputArtifact is the name of the output artifact to store the result in.
+            data.Set(context.OutputArtifact
+                    ?? throw new InvalidOperationException($"{Id} requires an output artifact."),
+                combinedEdges);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

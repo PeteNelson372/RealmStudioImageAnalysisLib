@@ -1,5 +1,8 @@
-﻿using RealmStudioShapeRenderingLib;
+﻿using Emgu.CV;
+using Emgu.CV.CvEnum;
+using RealmStudioShapeRenderingLib;
 using SkiaSharp;
+using System.Runtime.InteropServices;
 
 namespace RealmStudioImageAnalysisLib
 {
@@ -29,42 +32,28 @@ namespace RealmStudioImageAnalysisLib
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(context);
 
-            using var data =
-                importRegions == null
-                    ? new PerimeterPipelineData(bitmap)
-                    : new PerimeterPipelineData(
-                        bitmap,
-                        importRegions);
+            var data = importRegions == null ? new PerimeterPipelineData(bitmap) : new PerimeterPipelineData(bitmap, importRegions);
 
             foreach (PerimeterPipelineStage pipelineStage in pipeline.Stages)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
 
-                PerimeterStageDefinition definition =
-                    pipelineStage.Definition;
+                PerimeterStageDefinition definition = pipelineStage.Definition;
 
-                var stageContext =
-                    new PerimeterStageContext
-                    {
-                        CancellationToken = context.CancellationToken,
+                PerimeterStageContext stageContext =
+                    new(
+                        definition.Id,
+                        context.Progress,
+                        definition.InputArtifacts,
+                        definition.OutputArtifact,
+                        definition.Parameters,
+                        definition.SaveOutput,
+                        definition.OutputName,
+                        context.CancellationToken);
 
-                        Progress = context.Progress,
+                PerimeterStageResult result = pipelineStage.Stage.Process(data, stageContext);
 
-                        Parameters = definition.Parameters,
-
-                        SaveOutput = definition.SaveOutput,
-
-                        OutputArtifact = definition.OutputArtifact,
-
-                        OutputName = definition.OutputName
-                    };
-
-                PerimeterStageResult stageResult =
-                    pipelineStage.Stage.Process(
-                        data,
-                        stageContext);
-
-                if (!stageResult.Succeeded)
+                if (!result.Succeeded)
                 {
                     return new PerimeterPipelineResult
                     {
@@ -76,7 +65,7 @@ namespace RealmStudioImageAnalysisLib
 
                         RefinedPerimeters = [],
 
-                        FailureReason = stageResult.FailureReason
+                        FailureReason = result.FailureReason
                     };
                 }
 
@@ -87,25 +76,22 @@ namespace RealmStudioImageAnalysisLib
                     !string.IsNullOrWhiteSpace(
                         stageContext.OutputArtifact))
                 {
-                    if (data.TryGet<SKBitmap>(
-                        stageContext.OutputArtifact,
-                        out SKBitmap? debugBitmap))
+                    object? artifact = data.Get<object>(stageContext.OutputArtifact);
+
+                    if (artifact is SKBitmap bmp)
                     {
-                        if (debugBitmap != null)
-                        {
-                            SaveDebugBitmap(
-                                debugBitmap,
-                                stageContext.OutputName,
-                                context.OutputDirectory);
-                        }
+                        SaveDebugBitmap(bmp, stageContext.OutputName, context.OutputDirectory);
+                    }
+                    else if (artifact is Mat mat)
+                    {
+                        SaveMatBitmap(mat, stageContext.OutputName, context.OutputDirectory);
                     }
                 }
             }
 
             if (pipeline.Type == PerimeterPipelineType.Extraction)
             {
-                IReadOnlyList<ImportRegion> importRegionsResult =
-                    data.Get<IReadOnlyList<ImportRegion>>("ImportRegions");
+                IReadOnlyList<ImportRegion> importRegionsResult = data.Get<IReadOnlyList<ImportRegion>>("ImportRegions");
 
                 return new PerimeterPipelineResult
                 {
@@ -141,10 +127,7 @@ namespace RealmStudioImageAnalysisLib
                 $"{pipeline.Type}.");
         }
 
-        private static void SaveDebugBitmap(
-            SKBitmap bitmap,
-            string outputName,
-            string? outputDirectory)
+        private static void SaveDebugBitmap(SKBitmap bitmap, string outputName, string? outputDirectory)
         {
             if (string.IsNullOrWhiteSpace(outputDirectory))
             {
@@ -161,6 +144,88 @@ namespace RealmStudioImageAnalysisLib
             using SKData encoded = image.Encode(SKEncodedImageFormat.Png, 100);
 
             using FileStream stream = File.Create(outputFile);
+            encoded.SaveTo(stream);
+        }
+
+        private static void SaveMatBitmap(Mat mat, string outputName, string? outputDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(outputDirectory))
+            {
+                throw new InvalidOperationException(
+                    "Pipeline debugging is enabled and a stage requested " +
+                    "debug output, but no output directory was specified.");
+            }
+
+            if (mat.IsEmpty)
+                return;
+
+            if (mat.Depth != DepthType.Cv8U ||
+                (mat.NumberOfChannels != 1 &&
+                 mat.NumberOfChannels != 4))
+            {
+                throw new InvalidOperationException(
+                    "The Mat debug output must be an 8-bit single-channel " +
+                    "or four-channel image.");
+            }
+
+            Directory.CreateDirectory(outputDirectory);
+
+            string outputFile =
+                Path.Combine(
+                    outputDirectory,
+                    outputName);
+
+            SKColorType colorType =
+                mat.NumberOfChannels == 1
+                    ? SKColorType.Gray8
+                    : SKColorType.Bgra8888;
+
+            using SKBitmap bitmap =
+                new(
+                    mat.Width,
+                    mat.Height,
+                    colorType,
+                    SKAlphaType.Opaque);
+
+            int rowBytes =
+                mat.Width * mat.NumberOfChannels;
+
+            byte[] row = new byte[rowBytes];
+
+            for (int y = 0; y < mat.Height; y++)
+            {
+                IntPtr source =
+                    mat.DataPointer +
+                    (y * mat.Step);
+
+                Marshal.Copy(
+                    source,
+                    row,
+                    0,
+                    rowBytes);
+
+                IntPtr destination =
+                    bitmap.GetPixels() +
+                    (y * bitmap.RowBytes);
+
+                Marshal.Copy(
+                    row,
+                    0,
+                    destination,
+                    rowBytes);
+            }
+
+            using SKImage image =
+                SKImage.FromBitmap(bitmap);
+
+            using SKData encoded =
+                image.Encode(
+                    SKEncodedImageFormat.Png,
+                    100);
+
+            using FileStream stream =
+                File.Create(outputFile);
+
             encoded.SaveTo(stream);
         }
     }

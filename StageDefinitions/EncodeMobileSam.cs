@@ -37,8 +37,7 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             using var encoder = new MobileSamEncoder(encoderPath);
 
-            DenseTensor<float> embedding =
-                encoder.Encode(data.OriginalBitmap);
+            DenseTensor<float> embedding = encoder.Encode(data.OriginalBitmap);
 
             data.Set("MobileSamEmbedding", embedding);
 

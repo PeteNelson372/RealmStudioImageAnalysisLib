@@ -1,4 +1,5 @@
-﻿using SkiaSharp;
+﻿using Emgu.CV;
+using SkiaSharp;
 
 namespace RealmStudioImageAnalysisLib.StageDefinitions
 {
@@ -16,17 +17,25 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             ArgumentNullException.ThrowIfNull(context);
 
             context.CancellationToken.ThrowIfCancellationRequested();
+            List<string> inputNames = [.. context.InputArtifacts];
 
-            SKBitmap sourceBitmap =
-                data.Get<SKBitmap>("ExternalMaterialRemovedBitmap");
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
 
-            SKBitmap paddedBitmap =
-                CreateArtificialBorderBitmap(
-                    sourceBitmap,
-                    LandformArtificialBorderSize);
+            // Retrieve the declared input by name.
+            SKBitmap bitmap =
+                data.Get<SKBitmap>( context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException($"{Id} requires an input artifact."));
 
-            data.Set(
-                "PaddedBitmap",
+            SKBitmap paddedBitmap = CreateArtificialBorderBitmap(bitmap, LandformArtificialBorderSize);
+
+            data.Set(context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 paddedBitmap);
 
             context.Progress?.Report(

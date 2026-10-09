@@ -17,8 +17,20 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
             Mat nearWhiteMask =
-                data.Get<Mat>("NearWhiteMask");
+                data.Get<Mat>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
 
             Mat connectedWhite = CreateConnectedWhiteMask(
                 nearWhiteMask,
@@ -26,8 +38,11 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 nearWhiteMask.Height);
 
             data.Set(
-                "ConnectedWhite",
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 connectedWhite);
+
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

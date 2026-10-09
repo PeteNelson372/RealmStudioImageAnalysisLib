@@ -1,6 +1,8 @@
-﻿using Microsoft.Win32;
-using RealmStudioImageAnalysisLib.StageDefinitions;
+﻿using RealmStudioImageAnalysisLib.StageDefinitions;
+using RealmStudioShapeRenderingLib;
 using RealmStudioX.Infrastructure;
+using SkiaSharp;
+using System.Diagnostics;
 
 namespace RealmStudioImageAnalysisLib
 {
@@ -20,7 +22,6 @@ namespace RealmStudioImageAnalysisLib
         public PerimeterPipelineManager PipelineManager = new();
         public PerimeterStageRegistry StageRegistry = new();
         public PerimeterPipelineLoader PipelineLoader = new();
-        public PerimeterPipelineRunner PipelineRunner = new();
 
         public LandformPerimeterExtractionService()
         {
@@ -55,6 +56,8 @@ namespace RealmStudioImageAnalysisLib
             StageRegistry.Register(new FindMobileSamContours());
             StageRegistry.Register(new SelectLargestMobileSamContours());
             StageRegistry.Register(new CreateMobileSamPerimeters());
+            StageRegistry.Register(new TraceExternalCannyPerimeter());
+            StageRegistry.Register(new TraceExternalWhiteBoundary());
 
             // load image analysis pipelines
             var files = Directory.EnumerateFiles(imageAnalysisDirectory, "*.xml", SearchOption.AllDirectories).ToList();
@@ -72,6 +75,81 @@ namespace RealmStudioImageAnalysisLib
                     }
                 }
             }
+        }
+
+        public PerimeterExtractionResult RunExtraction(SKBitmap bitmap, PerimeterAlgorithmContext context)
+        {
+            ArgumentNullException.ThrowIfNull(bitmap);
+            ArgumentNullException.ThrowIfNull(context);
+
+            List<PerimeterPipeline> pipelines =
+                [.. PipelineManager.Pipelines
+                    .Where(p => p.Type == PerimeterPipelineType.Extraction).OrderByDescending(p => p.Priority)];
+
+            List<PerimeterPipelineAttempt> attempts = [];
+
+            foreach (PerimeterPipeline pipeline in pipelines)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+
+                Debug.WriteLine(
+                    $"==================================================");
+                Debug.WriteLine(
+                    $"Running extraction pipeline: {pipeline.Name}");
+                Debug.WriteLine(
+                    $"Priority: {pipeline.Priority}");
+
+                PerimeterPipelineResult result =
+                    PerimeterPipelineRunner.Run(
+                        pipeline,
+                        bitmap,
+                        context);
+
+                PerimeterEvaluationResult evaluation =
+                    PerimeterResultEvaluator.Evaluate(
+                        result,
+                        bitmap.Width,
+                        bitmap.Height);
+
+                attempts.Add(
+                    new PerimeterPipelineAttempt
+                    {
+                        PipelineName = pipeline.Name,
+                        Priority = pipeline.Priority,
+                        Result = result,
+                        Evaluation = evaluation
+                    });
+
+                Debug.WriteLine(
+                    $"Pipeline '{pipeline.Name}' " +
+                    $"evaluation: " +
+                    $"{evaluation.Score:F1}");
+
+                Debug.WriteLine(
+                    $"Accepted: {evaluation.Accepted}");
+
+                Debug.WriteLine(
+                    $"Reason: {evaluation.Reason}");
+
+                if (!evaluation.Accepted)
+                    continue;
+
+                return new PerimeterExtractionResult
+                {
+                    Succeeded = true,
+                    SelectedPipeline = pipeline.Name,
+                    ImportRegions = result.ImportRegions,
+                    Attempts = attempts
+                };
+            }
+
+            return new PerimeterExtractionResult
+            {
+                Succeeded = false,
+                Attempts = attempts,
+                FailureReason =
+                    "No extraction pipeline produced an acceptable result."
+            };
         }
     }
 }

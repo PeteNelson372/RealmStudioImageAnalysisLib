@@ -38,16 +38,33 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat repairedScaffold =
-                data.Get<Mat>("RepairedScaffold");
+            List<string> inputNames = [.. context.InputArtifacts];
 
-            IReadOnlyList<ImportRegion> importRegions =
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            Mat repairedScaffold =
+                data.Get<Mat>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
+
+            List<ImportRegion> importRegions =
                 ExtractImportRegionCandidates(
                     repairedScaffold,
                     repairedScaffold.Width,
                     repairedScaffold.Height);
 
-            data.Set("ImportRegions", importRegions);
+            // Publish the result using the configured output name.
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
+                importRegions);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress
@@ -105,8 +122,7 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     contours,
                     ChainApproxMethod.ChainApproxSimple);
 
-            Debug.WriteLine(
-                $"V13 contour tree contains {contours.Size} contours.");
+            Debug.WriteLine($"V13 contour tree contains {contours.Size} contours.");
 
             List<RawImportRegionCandidate> rawCandidates = [];
 
@@ -132,14 +148,13 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 // etc.
                 //
                 // Therefore use even depths >= 2.
-                if (depth < 2 ||
-                    (depth & 1) != 0)
+                
+                if (depth < 2 || (depth & 1) != 0)
                 {
                     continue;
                 }
-
-                if (contour.Size < 3)
-                    continue;
+                
+                if (contour.Size < 3) continue;
 
                 double area =
                     Math.Abs(CvInvoke.ContourArea(contour));
@@ -308,9 +323,7 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     $"confidence={confidence:F1}");
             }
 
-            Debug.WriteLine(
-                $"V13 raw import region candidates: " +
-                $"{rawCandidates.Count}");
+            Debug.WriteLine($"V13 raw import region candidates: " + $"{rawCandidates.Count}");
 
             // ------------------------------------------------------------
             // Sort largest first.

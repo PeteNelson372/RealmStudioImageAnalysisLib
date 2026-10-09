@@ -34,7 +34,9 @@ namespace RealmStudioImageAnalysisLib
         public IEnumerable<PerimeterPipeline> GetPipelines(PerimeterPipelineType type)
         {
             return _pipelines.Values
-                .Where(p => p.Type == type);
+                .Where(p => p.Type == type)
+                .OrderBy(p => p.Priority);
         }
+
     }
 }

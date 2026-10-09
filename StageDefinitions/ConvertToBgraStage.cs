@@ -1,4 +1,5 @@
-﻿using SkiaSharp;
+﻿using Emgu.CV.Reg;
+using SkiaSharp;
 
 namespace RealmStudioImageAnalysisLib.StageDefinitions
 {
@@ -20,7 +21,11 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 ?? throw new InvalidOperationException(
                     "Unable to convert image to BGRA8888.");
 
-            data.Set("BgraBitmap", bgraBitmap);
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
+                bgraBitmap);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

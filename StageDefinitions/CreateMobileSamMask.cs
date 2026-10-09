@@ -15,9 +15,17 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             ArgumentNullException.ThrowIfNull(context);
             context.CancellationToken.ThrowIfCancellationRequested();
 
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
             SegmentationResult result =
-                data.Get<SegmentationResult>(
-                    "MobileSamSegmentationResult");
+                data.Get<SegmentationResult>(context.GetInputArtifact(inputNames[0]));
 
             if (result.MaskDimensions.Length != 4)
             {
@@ -77,8 +85,9 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 }
             }
 
-            data.Set(
-                "MobileSamMask",
+            data.Set(context.OutputArtifact
+                ?? throw new InvalidOperationException(
+                    $"{Id} requires an output artifact."),
                 mask);
 
             context.Progress?.Report(

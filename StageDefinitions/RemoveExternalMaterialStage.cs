@@ -23,11 +23,22 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            SKBitmap sourceBitmap =
-                data.Get<SKBitmap>("BgraBitmap");
+            List<string> inputNames = [.. context.InputArtifacts];
 
-            using Mat externalMaterialMask =
-                DetectExternalMaterialMask(sourceBitmap);
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            SKBitmap sourceBitmap =
+                data.Get<SKBitmap>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
+
+            using Mat externalMaterialMask = DetectExternalMaterialMask(sourceBitmap);
 
             SKBitmap resultBitmap =
                 ReplaceExternalMaterialWithWhite(
@@ -35,7 +46,9 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     externalMaterialMask);
 
             data.Set(
-                "ExternalMaterialRemovedBitmap",
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 resultBitmap);
 
             context.Progress?.Report(

@@ -18,7 +18,20 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat combinedEdges = data.Get<Mat>("CombinedEdges");
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            Mat combinedEdges =
+                data.Get<Mat>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
 
             int width = combinedEdges.Width;
             int height = combinedEdges.Height;
@@ -60,7 +73,9 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 new MCvScalar(0));
 
             data.Set(
-                "DilatedScaffold",
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 dilatedScaffold);
 
             context.Progress?.Report(

@@ -17,7 +17,19 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat connectedWhite = data.Get<Mat>("ConnectedWhite");
+
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            Mat connectedWhite =
+                data.Get<Mat>(context.GetInputArtifact(inputNames[0])) ?? throw new InvalidOperationException(
+                        $"{Id} requires an input artifact.");
 
             Mat whiteBoundary = CreateMaskBoundary(
                 connectedWhite,
@@ -25,7 +37,9 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 connectedWhite.Height);
 
             data.Set(
-                "WhiteBoundary",
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 whiteBoundary);
 
             context.Progress?.Report(

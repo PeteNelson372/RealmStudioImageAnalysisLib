@@ -10,6 +10,8 @@ namespace RealmStudioImageAnalysisLib
 
         public bool Debug { get; init; }
 
+        public int Priority { get; init; }
+
         public List<PerimeterStageDefinition> Stages { get; } = [];
     }
 }

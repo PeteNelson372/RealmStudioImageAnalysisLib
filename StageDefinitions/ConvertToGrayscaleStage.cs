@@ -16,7 +16,20 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            Mat sourceMat = data.Get<Mat>("SourceMat");
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
+            Mat sourceMat =
+                data.Get<Mat>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
 
             Mat gray = new();
 
@@ -25,7 +38,12 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 gray,
                 ColorConversion.Bgra2Gray);
 
-            data.Set("Gray", gray);
+            // context.OutputArtifact is the name of the output artifact to store the result in.
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
+                gray);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

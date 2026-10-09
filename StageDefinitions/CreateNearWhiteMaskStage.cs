@@ -18,8 +18,20 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             context.CancellationToken.ThrowIfCancellationRequested();
 
+            List<string> inputNames = [.. context.InputArtifacts];
+
+            // this stage requires exactly one input artifact.
+            if (inputNames.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Stage '{Id}' requires exactly one input artifact, but {inputNames.Count} were provided.");
+            }
+
             Mat sourceMat =
-                data.Get<Mat>("SourceMat");
+                data.Get<Mat>(
+                    context.GetInputArtifact(inputNames[0])
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an input artifact."));
 
             Mat nearWhiteMask = CreateNearWhiteMask(
                 sourceMat,
@@ -28,8 +40,10 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 LandformWhiteColorDistance);
 
             data.Set(
-                "NearWhiteMask",
-                nearWhiteMask);
+                    context.OutputArtifact
+                        ?? throw new InvalidOperationException(
+                            $"{Id} requires an output artifact."),
+                    nearWhiteMask);
 
             context.Progress?.Report(
                 new PerimeterAlgorithmProgress

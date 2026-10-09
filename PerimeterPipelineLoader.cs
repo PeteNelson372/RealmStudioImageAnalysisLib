@@ -1,6 +1,7 @@
 ﻿namespace RealmStudioImageAnalysisLib
 {
     using RealmStudioShapeRenderingLib;
+    using SharpVectors.Dom;
     using System.Xml.Linq;
 
     public sealed class PerimeterPipelineLoader
@@ -50,17 +51,26 @@
                 debug = bool.TryParse(debugAttribute, out var result) && result;
             }
 
+            int priority = 0;
+
+            string? priorityAttribute = root.Attribute("priority")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(priorityAttribute))
+            {
+                priority = int.TryParse(priorityAttribute, out var result) ? result : 0;
+            }
+
             var definition = new PerimeterPipelineDefinition
             {
                 Name = name,
                 Type = type,
                 Debug = debug,
+                Priority = priority
             };
 
             foreach (var stageElement in root.Elements("Stage"))
             {
-                definition.Stages.Add(
-                    LoadStageDefinition(stageElement));
+                definition.Stages.Add(LoadStageDefinition(stageElement));
             }
 
             if (definition.Stages.Count == 0)
@@ -71,8 +81,7 @@
             return definition;
         }
 
-        private static PerimeterStageDefinition LoadStageDefinition(
-            XElement element)
+        private static PerimeterStageDefinition LoadStageDefinition(XElement element)
         {
             var id = (string?)element.Attribute("id");
 
@@ -81,28 +90,33 @@
                 throw new InvalidDataException("A Stage element is missing its 'id' attribute.");
             }
 
-            bool debug = false;
-
-            string? debugAttribute = element.Attribute("debug")?.Value;
-
-            if (!string.IsNullOrWhiteSpace(debugAttribute))
-            {
-                debug = bool.Parse(debugAttribute);
-            }
-
             var definition = new PerimeterStageDefinition
             {
                 Id = id,
 
-                SaveOutput = ParseBooleanAttribute(
-                    element,
-                    "saveOutput",
-                    defaultValue: false),
+                SaveOutput = ParseBooleanAttribute(element, "saveOutput", defaultValue: false),
 
                 OutputArtifact = (string?)element.Attribute("outputArtifact"),
 
                 OutputName = (string?)element.Attribute("outputName")
             };
+
+            string? inputArtifact = element.Attribute("inputArtifact")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(inputArtifact))
+            {
+                definition.InputArtifacts.Add(inputArtifact);
+            }
+
+            foreach (XElement inputElement in element.Elements("InputArtifact"))
+            {
+                string? name = inputElement.Attribute("name")?.Value;
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    definition.InputArtifacts.Add(name);
+                }
+            }
 
             foreach (var parameter in element.Elements("Parameter"))
             {
@@ -125,10 +139,7 @@
             return definition;
         }
 
-        private static bool ParseBooleanAttribute(
-            XElement element,
-            string name,
-            bool defaultValue)
+        private static bool ParseBooleanAttribute(XElement element, string name, bool defaultValue)
         {
             var value = (string?)element.Attribute(name);
 
