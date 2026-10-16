@@ -13,7 +13,10 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
     {
         public string Id => "ExtractCandidateRegions";
 
-        private const int ImportRegionMinimumArea = 5000;
+        private const double ImportRegionMinimumAreaFraction = 0.0005; // 0.05%
+        private const double ImportRegionMinimumAreaFloor = 25;
+        private const double ImportRegionMinimumAreaCeiling = 5000;
+
         private const int LandformArtificialBorderSize = 2;
         private const int ImportRegionScaffoldSupportRadius = 3;
 
@@ -159,8 +162,12 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 double area =
                     Math.Abs(CvInvoke.ContourArea(contour));
 
-                if (area < ImportRegionMinimumArea)
+                double minimumArea = CalculateMinimumRegionArea(imageWidth, imageHeight);
+
+                if (area < minimumArea)
+                {
                     continue;
+                }
 
                 System.Drawing.Rectangle contourBounds =
                     CvInvoke.BoundingRectangle(
@@ -340,7 +347,7 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             foreach (RawImportRegionCandidate raw in rawCandidates)
             {
-                ImportRegionState state = raw.Confidence >= 75.0 ? ImportRegionState.ProposedHighConfidence : ImportRegionState.ProposedLowConfidence;
+                ImportRegionState state =   ImportRegionState.Proposed;
 
                 ImportRegion region = new(raw.Geometry)
                 {
@@ -376,6 +383,17 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             return new SKPoint(
                 bounds.MidX,
                 bounds.MidY);
+        }
+
+        private static double CalculateMinimumRegionArea(int imageWidth, int imageHeight)
+        {
+            double imageArea =
+                (double)imageWidth * imageHeight;
+
+            return Math.Clamp(
+                imageArea * ImportRegionMinimumAreaFraction,
+                ImportRegionMinimumAreaFloor,
+                ImportRegionMinimumAreaCeiling);
         }
 
         private static double CalculateImportRegionConfidence(double areaScore, double sizeScore, double shapeScore, double scaffoldSupport,

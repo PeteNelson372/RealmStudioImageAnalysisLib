@@ -37,8 +37,8 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             ArgumentNullException.ThrowIfNull(context);
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            IReadOnlyList<ImportRegion> regions =
-                data.Get<IReadOnlyList<ImportRegion>>("AcceptedImportRegions");
+            List<ImportRegion> regions =
+                data.Get<List<ImportRegion>>("AcceptedImportRegions");
 
             DenseTensor<float> embedding =
                 data.Get<DenseTensor<float>>("MobileSamEmbedding");

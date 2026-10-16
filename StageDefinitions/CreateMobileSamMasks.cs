@@ -1,5 +1,7 @@
-﻿using Emgu.CV;
-using Emgu.CV.Structure;
+﻿
+using Emgu.CV;
+using Emgu.CV.CvEnum;
+using System.Runtime.InteropServices;
 
 namespace RealmStudioImageAnalysisLib.StageDefinitions
 {
@@ -19,106 +21,119 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 data.Get<IReadOnlyList<SegmentationResult>>(
                     "MobileSamSegmentationResults");
 
-            List<Image<Gray, byte>> masks = [];
+            List<Mat> masks = [];
 
-            for (int i = 0; i < results.Count; i++)
+            const float threshold = 0.0f;
+
+            try
             {
-                context.CancellationToken.ThrowIfCancellationRequested();
-
-                SegmentationResult result =
-                    results[i];
-
-                //
-                // The single-mask decoder returns:
-                //
-                //     [1, 1, height, width]
-                //
-                if (result.MaskDimensions.Length != 4)
+                for (int i = 0; i < results.Count; i++)
                 {
-                    throw new InvalidOperationException(
-                        "Unexpected MobileSAM mask dimensions: " +
-                        $"[{string.Join(
-                            ", ",
-                            result.MaskDimensions)}]");
-                }
+                    context.CancellationToken.ThrowIfCancellationRequested();
 
-                if (result.MaskDimensions[0] != 1 ||
-                    result.MaskDimensions[1] != 1)
-                {
-                    throw new InvalidOperationException(
-                        "The single-mask MobileSAM decoder " +
-                        "returned unexpected dimensions: " +
-                        $"[{string.Join(
-                            ", ",
-                            result.MaskDimensions)}]");
-                }
+                    SegmentationResult result = results[i];
 
-                int height =
-                    result.MaskDimensions[2];
-
-                int width =
-                    result.MaskDimensions[3];
-
-                int maskSize =
-                    width * height;
-
-                if (result.Masks.Length < maskSize)
-                {
-                    throw new InvalidOperationException(
-                        "MobileSAM returned a mask buffer " +
-                        "smaller than expected.");
-                }
-
-                //
-                // The decoder has already resized the mask to
-                // orig_im_size. Therefore these coordinates are
-                // already in source-image/map coordinates.
-                //
-                Image<Gray, byte> mask =
-                    new(
-                        width,
-                        height);
-
-                const float threshold = 0.0f;
-
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
+                    // Expected dimensions: [1, 1, height, width].
+                    if (result.MaskDimensions.Length != 4 ||
+                        result.MaskDimensions[0] != 1 ||
+                        result.MaskDimensions[1] != 1)
                     {
-                        float value =
-                            result.Masks[
-                                y * width + x];
+                        throw new InvalidOperationException(
+                            "Unexpected MobileSAM mask dimensions: " +
+                            $"[{string.Join(", ", result.MaskDimensions)}]");
+                    }
 
-                        mask.Data[y, x, 0] =
-                            value > threshold
+                    int height = result.MaskDimensions[2];
+                    int width = result.MaskDimensions[3];
+
+                    if (height <= 0 || width <= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "MobileSAM returned invalid mask dimensions.");
+                    }
+
+                    int maskSize = checked(width * height);
+
+                    if (result.Masks.Length < maskSize)
+                    {
+                        throw new InvalidOperationException(
+                            "MobileSAM returned a mask buffer " +
+                            "smaller than expected.");
+                    }
+
+                    // Create an 8-bit, single-channel grayscale Mat.
+                    Mat mask = new(
+                        height,
+                        width,
+                        DepthType.Cv8U,
+                        1);
+
+                    try
+                    {
+                        byte[] pixels = new byte[maskSize];
+
+                        for (int j = 0; j < maskSize; j++)
+                        {
+                            pixels[j] = result.Masks[j] > threshold
                                 ? (byte)255
                                 : (byte)0;
+                        }
+
+                        // Copy the managed buffer into the Mat.
+                        if (!mask.IsContinuous)
+                        {
+                            throw new InvalidOperationException(
+                                "The allocated mask matrix is not continuous.");
+                        }
+
+                        Marshal.Copy(
+                            pixels,
+                            0,
+                            mask.DataPointer,
+                            pixels.Length);
+
+                        masks.Add(mask);
                     }
+                    catch
+                    {
+                        mask.Dispose();
+                        throw;
+                    }
+
+                    context.Progress?.Report(
+                        new PerimeterAlgorithmProgress
+                        {
+                            Stage = Id,
+                            Progress =
+                                (double)(i + 1) /
+                                Math.Max(1, results.Count),
+                            Status =
+                                $"Created MobileSAM mask " +
+                                $"{i + 1} of {results.Count}."
+                        });
                 }
 
-                masks.Add(mask);
+                data.Set(
+                    "MobileSamMasks",
+                    new MobileSamMaskSet(masks));
 
-                context.Progress?.Report(
-                    new PerimeterAlgorithmProgress
-                    {
-                        Stage = Id,
-                        Progress =
-                            (double)(i + 1) /
-                            Math.Max(1, results.Count),
-                        Status =
-                            $"Created MobileSAM mask " +
-                            $"{i + 1} of {results.Count}."
-                    });
+                // Ownership of the masks has been transferred to
+                // MobileSamMaskSet / pipeline data.
+                return new PerimeterStageResult
+                {
+                    Succeeded = true
+                };
             }
-
-            data.Set(
-                "MobileSamMasks",
-                new MobileSamMaskSet(masks));
-
-            return new PerimeterStageResult
+            catch
             {
-                Succeeded = true
-            };
+                // Dispose any masks created if processing fails.
+                foreach (Mat mask in masks)
+                {
+                    mask.Dispose();
+                }
+
+                throw;
+            }
         }
     }
 }

@@ -1,12 +1,11 @@
 ﻿namespace RealmStudioImageAnalysisLib
 {
     using RealmStudioShapeRenderingLib;
-    using SharpVectors.Dom;
     using System.Xml.Linq;
 
     public sealed class PerimeterPipelineLoader
     {
-        public PerimeterPipelineDefinition LoadDefinition(string fileName)
+        public static PerimeterPipelineDefinition LoadDefinition(string fileName)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
@@ -60,9 +59,16 @@
                 priority = int.TryParse(priorityAttribute, out var result) ? result : 0;
             }
 
+            var description = (string?)root.Attribute("description");
+            var bestFor = (string?)root.Attribute("bestFor");
+            var limitations = (string?)root.Attribute("limitations");
+
             var definition = new PerimeterPipelineDefinition
             {
                 Name = name,
+                Description = description ?? string.Empty,
+                BestFor = bestFor ?? string.Empty,
+                Limitations = limitations ?? string.Empty,
                 Type = type,
                 Debug = debug,
                 Priority = priority

@@ -1,14 +1,13 @@
 ﻿using Emgu.CV;
-using Emgu.CV.Structure;
 
 namespace RealmStudioImageAnalysisLib
 {
     public sealed class MobileSamMaskSet : IDisposable
     {
-        public IReadOnlyList<Image<Gray, byte>> Masks { get; }
+        public IReadOnlyList<Mat> Masks { get; }
 
         public MobileSamMaskSet(
-            IReadOnlyList<Image<Gray, byte>> masks)
+            IReadOnlyList<Mat> masks)
         {
             ArgumentNullException.ThrowIfNull(masks);
 
@@ -17,7 +16,7 @@ namespace RealmStudioImageAnalysisLib
 
         public void Dispose()
         {
-            foreach (Image<Gray, byte> mask in Masks)
+            foreach (Mat mask in Masks)
             {
                 mask.Dispose();
             }

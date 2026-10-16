@@ -38,5 +38,19 @@ namespace RealmStudioImageAnalysisLib
                 .OrderBy(p => p.Priority);
         }
 
+        public IEnumerable<PerimeterPipeline> GetExtractionPipelines()
+        {
+            return _pipelines.Values
+                .Where(p => p.Type == PerimeterPipelineType.Extraction)
+                .OrderBy(p => p.Priority);
+        }
+
+        public IEnumerable<PerimeterPipeline> GetRefinementPipelines()
+        {
+            return _pipelines.Values
+                .Where(p => p.Type == PerimeterPipelineType.Refinement)
+                .OrderBy(p => p.Priority);
+        }
+
     }
 }

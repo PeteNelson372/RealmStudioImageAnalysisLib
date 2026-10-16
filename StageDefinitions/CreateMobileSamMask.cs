@@ -1,11 +1,15 @@
-﻿using Emgu.CV;
-using Emgu.CV.Structure;
+﻿
+using Emgu.CV;
+using Emgu.CV.CvEnum;
+using System.Runtime.InteropServices;
 
 namespace RealmStudioImageAnalysisLib.StageDefinitions
 {
     public sealed class CreateMobileSamMask : IPerimeterStage
     {
         public string Id => "CreateMobileSamMask";
+
+        public float Threshold { get; set; } = 0.0f;
 
         public PerimeterStageResult Process(
             PerimeterPipelineData data,
@@ -17,7 +21,6 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             List<string> inputNames = [.. context.InputArtifacts];
 
-            // this stage requires exactly one input artifact.
             if (inputNames.Count != 1)
             {
                 throw new InvalidOperationException(
@@ -25,69 +28,61 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             }
 
             SegmentationResult result =
-                data.Get<SegmentationResult>(context.GetInputArtifact(inputNames[0]));
+                data.Get<SegmentationResult>(
+                    context.GetInputArtifact(inputNames[0]));
 
-            if (result.MaskDimensions.Length != 4)
-            {
-                throw new InvalidOperationException(
-                    "Unexpected MobileSAM mask dimensions: " +
-                    $"[{string.Join(
-                        ", ",
-                        result.MaskDimensions)}]");
-            }
-
-            if (result.MaskDimensions[0] != 1 ||
+            if (result.MaskDimensions.Length != 4 ||
+                result.MaskDimensions[0] != 1 ||
                 result.MaskDimensions[1] != 1)
             {
                 throw new InvalidOperationException(
-                    "The single-mask MobileSAM decoder " +
-                    "returned unexpected dimensions: " +
-                    $"[{string.Join(
-                        ", ",
-                        result.MaskDimensions)}]");
+                    "Unexpected MobileSAM mask dimensions: " +
+                    $"[{string.Join(", ", result.MaskDimensions)}]");
             }
 
-            int height =
-                result.MaskDimensions[2];
-
-            int width =
-                result.MaskDimensions[3];
-
-            int maskSize =
-                width * height;
+            int height = result.MaskDimensions[2];
+            int width = result.MaskDimensions[3];
+            int maskSize = checked(width * height);
 
             if (result.Masks.Length < maskSize)
             {
                 throw new InvalidOperationException(
-                    "MobileSAM returned a mask buffer " +
-                    "smaller than expected.");
+                    "MobileSAM returned a mask buffer smaller than expected.");
             }
 
-            Image<Gray, byte> mask =
-                new(
-                    width,
-                    height);
+            using Mat mask = new(
+                height,
+                width,
+                DepthType.Cv8U,
+                1);
 
-            const float threshold = 0.0f;
+            byte[] pixels = new byte[maskSize];
 
-            for (int y = 0; y < height; y++)
+            for (int i = 0; i < maskSize; i++)
             {
-                for (int x = 0; x < width; x++)
-                {
-                    float value =
-                        result.Masks[
-                            y * width + x];
-
-                    mask.Data[y, x, 0] =
-                        value > threshold
-                            ? (byte)255
-                            : (byte)0;
-                }
+                pixels[i] = result.Masks[i] > Threshold
+                    ? (byte)255
+                    : (byte)0;
             }
 
-            data.Set(context.OutputArtifact
-                ?? throw new InvalidOperationException(
-                    $"{Id} requires an output artifact."),
+            // Copy the managed pixel buffer into the Mat.
+            // A newly allocated, continuous Mat has tightly packed rows.
+            if (!mask.IsContinuous)
+            {
+                throw new InvalidOperationException(
+                    "The allocated mask matrix is not continuous.");
+            }
+
+            Marshal.Copy(
+                pixels,
+                0,
+                mask.DataPointer,
+                pixels.Length);
+
+            data.Set(
+                context.OutputArtifact
+                    ?? throw new InvalidOperationException(
+                        $"{Id} requires an output artifact."),
                 mask);
 
             context.Progress?.Report(

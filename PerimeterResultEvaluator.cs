@@ -30,13 +30,9 @@ namespace RealmStudioImageAnalysisLib
                 };
             }
 
-            List<ImportRegion> candidates =
-                [.. result.ImportRegions
-                .OrderByDescending(
-                    r => r.Area)];
+            List<ImportRegion> candidates = [.. result.ImportRegions.OrderByDescending(r => r.Area)];
 
-            ImportRegion best =
-                candidates[0];
+            ImportRegion best = candidates[0];
 
             double totalArea =
                 candidates.Sum(r => r.Area);

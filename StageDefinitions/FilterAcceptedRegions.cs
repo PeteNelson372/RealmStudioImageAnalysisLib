@@ -14,11 +14,11 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             ArgumentNullException.ThrowIfNull(context);
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            IReadOnlyList<ImportRegion> importRegions =
-                data.Get<IReadOnlyList<ImportRegion>>(
+            List<ImportRegion> importRegions =
+                data.Get<List<ImportRegion>>(
                     "ImportRegions");
 
-            IReadOnlyList<ImportRegion> acceptedRegions =
+            List<ImportRegion> acceptedRegions =
                 [.. importRegions
                     .Where(r =>
                         r.State == ImportRegionState.Accepted)];

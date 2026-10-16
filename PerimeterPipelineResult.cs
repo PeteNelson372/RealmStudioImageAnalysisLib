@@ -9,9 +9,9 @@ namespace RealmStudioImageAnalysisLib
 
         public bool Succeeded { get; init; }
 
-        public IReadOnlyList<ImportRegion> ImportRegions { get; init; } = [];
+        public List<ImportRegion> ImportRegions { get; init; } = [];
 
-        public IReadOnlyList<SKPath> RefinedPerimeters { get; init; } = [];
+        public List<SKPath> RefinedPerimeters { get; init; } = [];
 
         public string? FailureReason { get; init; }
     }

@@ -23,6 +23,8 @@ namespace RealmStudioImageAnalysisLib
         public PerimeterStageRegistry StageRegistry = new();
         public PerimeterPipelineLoader PipelineLoader = new();
 
+        List<PerimeterPipelineAttempt> Attempts = [];
+
         public LandformPerimeterExtractionService()
         {
             assetsDirectory = AssetManager.RootAssetDirectory;
@@ -58,6 +60,8 @@ namespace RealmStudioImageAnalysisLib
             StageRegistry.Register(new CreateMobileSamPerimeters());
             StageRegistry.Register(new TraceExternalCannyPerimeter());
             StageRegistry.Register(new TraceExternalWhiteBoundary());
+            StageRegistry.Register(new MergeAdjacentRegions());
+            StageRegistry.Register(new FillRegionHoles());
 
             // load image analysis pipelines
             var files = Directory.EnumerateFiles(imageAnalysisDirectory, "*.xml", SearchOption.AllDirectories).ToList();
@@ -69,12 +73,76 @@ namespace RealmStudioImageAnalysisLib
                     var extension = Path.GetExtension(file).ToLowerInvariant();
                     if (extension == ".xml")
                     {
-                        var definition = PipelineLoader.LoadDefinition(file);
+                        var definition = PerimeterPipelineLoader.LoadDefinition(file);
                         var pipeline = new PerimeterPipeline(definition, StageRegistry);
                         PipelineManager.Add(pipeline);
                     }
                 }
             }
+        }
+
+        public PerimeterExtractionResult RunPipeline(PerimeterPipeline pipeline, SKBitmap bitmap, PerimeterAlgorithmContext context)
+        {
+            ArgumentNullException.ThrowIfNull(pipeline);
+            ArgumentNullException.ThrowIfNull(bitmap);
+            ArgumentNullException.ThrowIfNull(context);
+            
+            Debug.WriteLine($"==================================================");
+            
+            Debug.WriteLine($"Running extraction pipeline: {pipeline.Name}");
+            
+            Debug.WriteLine($"Priority: {pipeline.Priority}");
+
+            PerimeterPipelineResult result =
+                PerimeterPipelineRunner.Run(
+                    pipeline,
+                    bitmap,
+                    context);
+            
+            PerimeterEvaluationResult evaluation =
+                PerimeterResultEvaluator.Evaluate(
+                    result,
+                    bitmap.Width,
+                    bitmap.Height);
+
+            Attempts.Add(
+                new PerimeterPipelineAttempt
+                {
+                    PipelineName = pipeline.Name,
+                    Priority = pipeline.Priority,
+                    Result = result,
+                    Evaluation = evaluation
+                });
+            
+            Debug.WriteLine(
+                $"Pipeline '{pipeline.Name}' " +
+                $"evaluation: " +
+                $"{evaluation.Score:F1}");
+            
+            Debug.WriteLine(
+                $"Accepted: {evaluation.Accepted}");
+            
+            Debug.WriteLine(
+                $"Reason: {evaluation.Reason}");
+            
+            if (!evaluation.Accepted)
+            {
+                return new PerimeterExtractionResult
+                {
+                    Succeeded = false,
+                    Attempts = Attempts,
+                    FailureReason =
+                        $"Pipeline '{pipeline.Name}' did not produce an acceptable result."
+                };
+            }
+
+            return new PerimeterExtractionResult
+            {
+                Succeeded = true,
+                SelectedPipeline = pipeline.Name,
+                ImportRegions = result.ImportRegions,
+                Attempts = Attempts
+            };
         }
 
         public PerimeterExtractionResult RunExtraction(SKBitmap bitmap, PerimeterAlgorithmContext context)
@@ -85,8 +153,6 @@ namespace RealmStudioImageAnalysisLib
             List<PerimeterPipeline> pipelines =
                 [.. PipelineManager.Pipelines
                     .Where(p => p.Type == PerimeterPipelineType.Extraction).OrderByDescending(p => p.Priority)];
-
-            List<PerimeterPipelineAttempt> attempts = [];
 
             foreach (PerimeterPipeline pipeline in pipelines)
             {
@@ -111,7 +177,7 @@ namespace RealmStudioImageAnalysisLib
                         bitmap.Width,
                         bitmap.Height);
 
-                attempts.Add(
+                Attempts.Add(
                     new PerimeterPipelineAttempt
                     {
                         PipelineName = pipeline.Name,
@@ -139,14 +205,14 @@ namespace RealmStudioImageAnalysisLib
                     Succeeded = true,
                     SelectedPipeline = pipeline.Name,
                     ImportRegions = result.ImportRegions,
-                    Attempts = attempts
+                    Attempts = Attempts
                 };
             }
 
             return new PerimeterExtractionResult
             {
                 Succeeded = false,
-                Attempts = attempts,
+                Attempts = Attempts,
                 FailureReason =
                     "No extraction pipeline produced an acceptable result."
             };

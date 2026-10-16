@@ -12,6 +12,12 @@ namespace RealmStudioImageAnalysisLib
 
         public int Priority { get; init; }
 
+        public string Description { get; init; } = string.Empty;
+
+        public string BestFor { get; init; } = string.Empty;
+
+        public string Limitations { get; init; } = string.Empty;
+
         public IReadOnlyList<PerimeterPipelineStage> Stages { get; }
 
         public PerimeterPipeline(PerimeterPipelineDefinition definition, PerimeterStageRegistry registry)
@@ -26,6 +32,12 @@ namespace RealmStudioImageAnalysisLib
             Debug = definition.Debug;
 
             Priority = definition.Priority;
+
+            Description = definition.Description;
+
+            BestFor = definition.BestFor;
+
+            Limitations = definition.Limitations;
 
             Stages = [.. definition.Stages.Select(stageDefinition =>
                 {

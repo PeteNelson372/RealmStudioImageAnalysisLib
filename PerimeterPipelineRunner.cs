@@ -18,7 +18,7 @@ namespace RealmStudioImageAnalysisLib
         }
 
         public static PerimeterPipelineResult Run(PerimeterPipeline pipeline, SKBitmap bitmap,
-            IReadOnlyList<ImportRegion> importRegions, PerimeterAlgorithmContext context)
+            List<ImportRegion> importRegions, PerimeterAlgorithmContext context)
         {
             ArgumentNullException.ThrowIfNull(importRegions);
 
@@ -26,7 +26,7 @@ namespace RealmStudioImageAnalysisLib
         }
 
         private static PerimeterPipelineResult RunInternal(PerimeterPipeline pipeline, SKBitmap bitmap,
-            IReadOnlyList<ImportRegion>? importRegions, PerimeterAlgorithmContext context)
+            List<ImportRegion>? importRegions, PerimeterAlgorithmContext context)
         {
             ArgumentNullException.ThrowIfNull(pipeline);
             ArgumentNullException.ThrowIfNull(bitmap);
@@ -71,10 +71,8 @@ namespace RealmStudioImageAnalysisLib
 
                 if (pipeline.Debug &&
                     stageContext.SaveOutput &&
-                    !string.IsNullOrWhiteSpace(
-                        stageContext.OutputName) &&
-                    !string.IsNullOrWhiteSpace(
-                        stageContext.OutputArtifact))
+                    !string.IsNullOrWhiteSpace(stageContext.OutputName) &&
+                    !string.IsNullOrWhiteSpace(stageContext.OutputArtifact))
                 {
                     object? artifact = data.Get<object>(stageContext.OutputArtifact);
 
@@ -86,12 +84,30 @@ namespace RealmStudioImageAnalysisLib
                     {
                         SaveMatBitmap(mat, stageContext.OutputName, context.OutputDirectory);
                     }
+                    else if (artifact is ImportRegion region)
+                    {
+                        using SKBitmap regionBitmap = new((int)region.HitPath.Bounds.Width, (int)region.HitPath.Bounds.Height, SKColorType.Gray8, SKAlphaType.Opaque);
+                        using SKCanvas canvas = new(regionBitmap);
+
+                        canvas.Clear(SKColors.Black);
+                        canvas.DrawPath(region.HitPath, PaintObjects.DebugPaint);
+
+                        SaveDebugBitmap(regionBitmap, stageContext.OutputName, context.OutputDirectory);
+                    }
+                    else if (artifact is SKPath path)
+                    {
+                        using SKBitmap pathBitmap = new((int)path.Bounds.Width, (int)path.Bounds.Height, SKColorType.Gray8, SKAlphaType.Opaque);
+                        using SKCanvas canvas = new(pathBitmap);
+                        canvas.Clear(SKColors.Black);
+                        canvas.DrawPath(path, PaintObjects.DebugPaint);
+                        SaveDebugBitmap(pathBitmap, stageContext.OutputName, context.OutputDirectory);
+                    }
                 }
             }
 
             if (pipeline.Type == PerimeterPipelineType.Extraction)
             {
-                IReadOnlyList<ImportRegion> importRegionsResult = data.Get<IReadOnlyList<ImportRegion>>("ImportRegions");
+                List<ImportRegion> importRegionsResult = data.Get<List<ImportRegion>>("ImportRegions");
 
                 return new PerimeterPipelineResult
                 {
@@ -107,8 +123,7 @@ namespace RealmStudioImageAnalysisLib
 
             if (pipeline.Type == PerimeterPipelineType.Refinement)
             {
-                IReadOnlyList<SKPath> refinedPerimeters =
-                    data.Get<IReadOnlyList<SKPath>>("RefinedPerimeters");
+                List<SKPath> refinedPerimeters = data.Get<List<SKPath>>("RefinedPerimeters");
 
                 return new PerimeterPipelineResult
                 {

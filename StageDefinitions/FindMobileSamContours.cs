@@ -27,7 +27,7 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
 
-                Image<Gray, byte> mask =
+                Mat mask =
                     maskSet.Masks[i];
 
                 VectorOfVectorOfPoint contours =

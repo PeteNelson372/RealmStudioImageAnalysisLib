@@ -7,10 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Emgu.CV" Version="4.13.0.5924" />
-    <PackageReference Include="Emgu.CV.runtime.windows" Version="4.13.0.5924" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
-    <PackageReference Include="SkiaSharp" Version="4.152.1" />
+    <PackageReference Include="Emgu.CV" Version="5.0.0.6584" />
+    <PackageReference Include="Emgu.CV.runtime.windows" Version="5.0.0.6584" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
   </ItemGroup>
 
   <ItemGroup>

@@ -208,7 +208,7 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 {
                     Index = 1,
                     Source = ImportRegionSource.Automatic,
-                    State = ImportRegionState.ProposedLowConfidence,
+                    State = ImportRegionState.Proposed,
                     Confidence = null,
                     Area = largestArea,
                     PerimeterLength = perimeterLength,
