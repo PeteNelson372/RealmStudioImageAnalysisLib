@@ -1,174 +1,180 @@
 ﻿using RealmStudioShapeRenderingLib;
+using SkiaSharp;
 using System.Diagnostics;
 
-namespace RealmStudioImageAnalysisLib
+namespace RealmStudioImageAnalysisLib;
+
+public sealed class PerimeterResultEvaluator
 {
-    public sealed class PerimeterResultEvaluator
+    private const int MinimumPerimeterPointCount = 5;
+    private const double MinimumCandidateArea = 25.0;
+
+    public static PerimeterEvaluationResult Evaluate(
+        PerimeterPipelineResult result,
+        int imageWidth,
+        int imageHeight)
     {
-        public static PerimeterEvaluationResult Evaluate(PerimeterPipelineResult result, int imageWidth, int imageHeight)
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (!result.Succeeded)
         {
-            if (!result.Succeeded)
-            {
-                return new PerimeterEvaluationResult
-                {
-                    Accepted = false,
-                    Score = 0,
-                    FailureMode = "PipelineFailed",
-                    Reason = result.FailureReason ??
-                             "The pipeline failed."
-                };
-            }
-
-            if (result.ImportRegions.Count == 0)
-            {
-                return new PerimeterEvaluationResult
-                {
-                    Accepted = false,
-                    Score = 0,
-                    FailureMode = "NoCandidates",
-                    Reason = "The pipeline produced no candidate regions."
-                };
-            }
-
-            List<ImportRegion> candidates = [.. result.ImportRegions.OrderByDescending(r => r.Area)];
-
-            ImportRegion best = candidates[0];
-
-            double totalArea =
-                candidates.Sum(r => r.Area);
-
-            double imageArea =
-                (double)imageWidth * imageHeight;
-
-            double largestAreaFraction =
-                imageArea > 0
-                    ? best.Area / imageArea
-                    : 0.0;
-
-            double largestAreaDominance =
-                totalArea > 0
-                    ? best.Area / totalArea
-                    : 0.0;
-
-            double bestScaffoldSupport =
-                candidates.Max(
-                    r => r.ScaffoldPerimeterSupport);
-
-            double bestConfidence =
-                candidates.Max(
-                    r => r.Confidence ?? 0.0);
-
-            Dictionary<string, double> metrics = new()
-            {
-                ["CandidateCount"] = candidates.Count,
-                ["LargestAreaFraction"] = largestAreaFraction,
-                ["LargestAreaDominance"] = largestAreaDominance,
-                ["BestScaffoldSupport"] = bestScaffoldSupport,
-                ["BestConfidence"] = bestConfidence
-            };
-
-            Debug.WriteLine(
-                "--------------------------------------------------");
-            Debug.WriteLine(
-                "Perimeter extraction evaluation");
-            Debug.WriteLine(
-                $"Candidates: {candidates.Count}");
-            Debug.WriteLine(
-                $"Largest area fraction: {largestAreaFraction:P1}");
-            Debug.WriteLine(
-                $"Largest area dominance: {largestAreaDominance:P1}");
-            Debug.WriteLine(
-                $"Best scaffold support: {bestScaffoldSupport:P1}");
-            Debug.WriteLine(
-                $"Best confidence: {bestConfidence:F1}");
-
-            // ------------------------------------------------------------
-            // Obvious failure: candidates exist, but none has meaningful
-            // support from the scaffold.
-            // ------------------------------------------------------------
-
-            if (bestScaffoldSupport < 0.50)
-            {
-                return new PerimeterEvaluationResult
-                {
-                    Accepted = false,
-                    Score = 0,
-                    FailureMode = "InsufficientPerimeterSupport",
-                    Reason =
-                        $"Best candidate has only " +
-                        $"{bestScaffoldSupport:P1} scaffold support.",
-                    Metrics = metrics
-                };
-            }
-
-            // ------------------------------------------------------------
-            // At this point we have a technically plausible result.
-            //
-            // DO NOT reject it merely because ImportRegion.Confidence
-            // is below 75. Confidence is a ranking signal, not a
-            // pipeline-success signal.
-            // ------------------------------------------------------------
-
-            double score =
-                CalculateScore(
-                    candidates,
-                    largestAreaFraction,
-                    largestAreaDominance,
-                    bestScaffoldSupport);
-
-            bool accepted =
-                score >= 50.0;
-
             return new PerimeterEvaluationResult
             {
-                Accepted = accepted,
-                Score = score,
-                FailureMode =
-                    accepted
-                        ? string.Empty
-                        : "LowOverallQuality",
+                Accepted = false,
+                Score = 0,
+                FailureMode = "PipelineFailed",
+                Reason = result.FailureReason ??
+                         "The pipeline failed."
+            };
+        }
+
+        if (result.ImportRegions.Count == 0)
+        {
+            return new PerimeterEvaluationResult
+            {
+                Accepted = false,
+                Score = 0,
+                FailureMode = "NoCandidates",
+                Reason = "The pipeline produced no candidate regions."
+            };
+        }
+
+        int usableCandidateCount = 0;
+        int bestPointCount = 0;
+        double largestCandidateArea = 0.0;
+
+        Debug.WriteLine(
+            "--------------------------------------------------");
+        Debug.WriteLine(
+            "Perimeter extraction evaluation");
+        Debug.WriteLine(
+            $"Candidates: {result.ImportRegions.Count}");
+
+        foreach (ImportRegion region in result.ImportRegions)
+        {
+            bool usable = IsUsableCandidate(
+                region,
+                out int pointCount,
+                out bool isClosed);
+
+            if (usable)
+            {
+                usableCandidateCount++;
+                bestPointCount = Math.Max(
+                    bestPointCount,
+                    pointCount);
+
+                largestCandidateArea = Math.Max(
+                    largestCandidateArea,
+                    region.Area);
+            }
+
+            Debug.WriteLine(
+                $"Candidate {region.Index}: " +
+                $"points={pointCount}, " +
+                $"area={region.Area:F0}, " +
+                $"closed={isClosed}, " +
+                $"usable={usable}");
+        }
+
+        Dictionary<string, double> metrics = new()
+        {
+            ["CandidateCount"] = result.ImportRegions.Count,
+            ["UsableCandidateCount"] = usableCandidateCount,
+            ["BestPointCount"] = bestPointCount,
+            ["LargestUsableCandidateArea"] = largestCandidateArea,
+            ["ImageWidth"] = imageWidth,
+            ["ImageHeight"] = imageHeight
+        };
+
+        Debug.WriteLine(
+            $"Usable candidates: {usableCandidateCount}");
+
+        // Reject only when no candidate has plausible perimeter geometry.
+        if (usableCandidateCount == 0)
+        {
+            return new PerimeterEvaluationResult
+            {
+                Accepted = false,
+                Score = 0,
+                FailureMode = "NoUsableCandidates",
                 Reason =
-                    accepted
-                        ? "Candidate set passed extraction evaluation."
-                        : "Candidate set did not meet overall quality criteria.",
+                    "No candidates have a closed, usable perimeter path.",
                 Metrics = metrics
             };
         }
 
-        private static double CalculateScore(
-            IReadOnlyList<ImportRegion> candidates,
-            double largestAreaFraction,
-            double largestAreaDominance,
-            double scaffoldSupport)
+        // This evaluator is a sanity check, not a quality ranking system.
+        // The user will inspect the proposed perimeters in the UI.
+        return new PerimeterEvaluationResult
         {
-            double score = 0;
+            Accepted = true,
+            Score = 100.0,
+            FailureMode = string.Empty,
+            Reason =
+                $"{usableCandidateCount} of " +
+                $"{result.ImportRegions.Count} candidates have usable geometry.",
+            Metrics = metrics
+        };
+    }
 
-            // Scaffold support is currently our strongest direct evidence.
-            score += scaffoldSupport * 40.0;
+    private static bool IsUsableCandidate(
+        ImportRegion region,
+        out int pointCount,
+        out bool isClosed)
+    {
+        pointCount = 0;
+        isClosed = false;
 
-            // A large candidate is generally more useful than a collection
-            // of tiny fragments.
-            score +=
-                Math.Clamp(
-                    largestAreaFraction / 0.25,
-                    0.0,
-                    1.0) * 30.0;
+        SKPath? path = region.PerimeterPath;
 
-            // If one candidate dominates the result, that's generally
-            // preferable to a collection of similarly-sized fragments.
-            score +=
-                largestAreaDominance * 20.0;
+        if (path is null || path.IsEmpty)
+            return false;
 
-            // Number of candidates is only a weak signal.
-            //
-            // We deliberately do NOT reject multiple candidates because
-            // maps can legitimately contain multiple landforms.
-            if (candidates.Count <= 3)
-                score += 10.0;
-            else if (candidates.Count <= 10)
-                score += 5.0;
+        pointCount = path.PointCount;
 
-            return Math.Clamp(score, 0.0, 100.0);
+        if (pointCount < 3)
+            return false;
+
+        SKRect bounds = path.Bounds;
+
+        if (bounds.Width <= 0 ||
+            bounds.Height <= 0 ||
+            !float.IsFinite(bounds.Left) ||
+            !float.IsFinite(bounds.Top) ||
+            !float.IsFinite(bounds.Right) ||
+            !float.IsFinite(bounds.Bottom))
+        {
+            return false;
         }
+
+        // Require every contour in the path to be closed.
+        using SKPathMeasure measure = new(path, false);
+
+        bool hasContour = false;
+        isClosed = true;
+
+        do
+        {
+            hasContour = true;
+
+            if (!measure.IsClosed)
+            {
+                isClosed = false;
+                break;
+            }
+        }
+        while (measure.NextContour());
+
+        if (!hasContour || !isClosed)
+            return false;
+
+        // Either sufficient path detail or a reasonable area is enough.
+        bool hasEnoughGeometry =
+            pointCount > MinimumPerimeterPointCount ||
+            (double.IsFinite(region.Area) &&
+             region.Area >= MinimumCandidateArea);
+
+        return hasEnoughGeometry;
     }
 }

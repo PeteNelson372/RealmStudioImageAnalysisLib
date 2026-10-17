@@ -62,6 +62,11 @@ namespace RealmStudioImageAnalysisLib
             StageRegistry.Register(new TraceExternalWhiteBoundary());
             StageRegistry.Register(new MergeAdjacentRegions());
             StageRegistry.Register(new FillRegionHoles());
+            StageRegistry.Register(new CreateLandMaskByColor());
+            StageRegistry.Register(new CleanLandMask());
+            StageRegistry.Register(new FillSmallHoles());
+            StageRegistry.Register(new RemoveThinLandFeatures());
+            StageRegistry.Register(new ExtractMaskRegions());
 
             // load image analysis pipelines
             var files = Directory.EnumerateFiles(imageAnalysisDirectory, "*.xml", SearchOption.AllDirectories).ToList();
