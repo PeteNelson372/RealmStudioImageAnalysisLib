@@ -27,7 +27,7 @@ namespace RealmStudioImageAnalysisLib
 
         public LandformPerimeterExtractionService()
         {
-            assetsDirectory = AssetManager.RootAssetDirectory;
+            assetsDirectory = ApplicationPreferences.Current.RootAssetDirectory;
 
             imageAnalysisDirectory = Path.Combine(assetsDirectory, "ImageAnalysis");
 
