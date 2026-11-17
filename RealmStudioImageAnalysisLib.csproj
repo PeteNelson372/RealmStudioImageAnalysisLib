@@ -9,8 +9,8 @@
   <ItemGroup>
     <PackageReference Include="Emgu.CV" Version="5.0.0.6584" />
     <PackageReference Include="Emgu.CV.runtime.windows" Version="5.0.0.6584" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
-    <PackageReference Include="SkiaSharp" Version="4.154.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
+    <PackageReference Include="SkiaSharp" Version="4.156.1" />
   </ItemGroup>
 
   <ItemGroup>
