@@ -58,10 +58,6 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 ?? throw new InvalidOperationException(
                     $"{Id} requires an output artifact.");
 
-            Debug.WriteLine(
-                $"{Id}: source image = " +
-                $"{sourceBitmap.Width}x{sourceBitmap.Height}");
-
             // ------------------------------------------------------------
             // Normalize the source to BGRA8888.
             //
@@ -172,14 +168,6 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                 totalPixels > 0
                     ? (double)foregroundPixels / totalPixels
                     : 0.0;
-
-            Debug.WriteLine(
-                $"{Id}: Lab b threshold = {MinimumLabBThreshold:F1}");
-
-            Debug.WriteLine(
-                $"{Id}: land-colored pixels = " +
-                $"{foregroundPixels:N0} / {totalPixels:N0} " +
-                $"({foregroundFraction:P1})");
 
             // ------------------------------------------------------------
             // Publish the mask.

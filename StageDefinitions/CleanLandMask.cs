@@ -63,10 +63,6 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
             int originalForegroundPixels =
                 CvInvoke.CountNonZero(landMask);
 
-            Debug.WriteLine(
-                $"{Id}: input={landMask.Cols}x{landMask.Rows}, " +
-                $"foreground pixels={originalForegroundPixels:N0}");
-
             context.CancellationToken.ThrowIfCancellationRequested();
 
             // ------------------------------------------------------------
@@ -106,11 +102,6 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
 
             int cleanedForegroundPixels =
                 CvInvoke.CountNonZero(cleanedMask);
-
-            Debug.WriteLine(
-                $"{Id}: kernel={ClosingKernelSize}x{ClosingKernelSize}, " +
-                $"iterations={ClosingIterations}, " +
-                $"foreground pixels={cleanedForegroundPixels:N0}");
 
             // Store a separate Mat so the output remains valid after
             // the local cleanedMask is disposed.

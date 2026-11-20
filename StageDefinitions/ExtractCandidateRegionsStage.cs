@@ -125,7 +125,6 @@ namespace RealmStudioImageAnalysisLib.StageDefinitions
                     contours,
                     ChainApproxMethod.ChainApproxSimple);
 
-            Debug.WriteLine($"V13 contour tree contains {contours.Size} contours.");
 
             List<RawImportRegionCandidate> rawCandidates = [];
 
